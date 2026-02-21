@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# environment variables
+.env
+
+# python cache
+__pycache__/
+
+# build output
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
