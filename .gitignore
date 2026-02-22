@@ -3,6 +3,11 @@ node_modules/
 
 # environment variables
 .env
+.env.*
+
+# logs
+logs.txt
+*.log
 
 # python cache
 __pycache__/
@@ -11,6 +16,16 @@ __pycache__/
 dist/
 build/
 
+# Docker volumes / local data
+pgdata/
+
 # OS files
 .DS_Store
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# system
+*.swp
