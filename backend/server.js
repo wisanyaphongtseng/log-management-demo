@@ -1,8 +1,15 @@
 require("dotenv").config();
 const express = require("express");
 const app = express();
-const fs = require("fs");
+//const fs = require("fs");
 const { Pool } = require("pg");
+const http = require("http");
+const { Server } = require("socket.io");
+//jwi
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+
+const JWT_SECRET = "supersecretkey";
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -31,7 +38,7 @@ app.post("/ingest", async (req, res) => {
         source: log.source || "unknown",
         event_type: log.event_type || "unknown",
         user: log.user || null,
-        src_ip: log.ip || null,
+        src_ip: log.ip || "0.0.0.0",
         raw: log
     };
 
@@ -78,6 +85,13 @@ app.post("/ingest", async (req, res) => {
 
     if (parseInt(result.rows[0].count) >= 5) {
         console.log("🚨 ALERT: Possible brute force from", normalizedLog.src_ip);
+
+        io.emit("security_alert", {
+            message: "Brute force attack detected",
+            ip: normalizedLog.src_ip,
+            attempts: result.rows[0].count,
+            time: new Date()
+        });
         }
     }
 
@@ -88,13 +102,20 @@ app.post("/ingest", async (req, res) => {
 });
 
 //Search API
-app.get("/logs", async (req, res) => {
+app.get("/logs", authenticate, async (req, res) => {
     const { tenant, ip } = req.query;
 
     let query = "SELECT * FROM logs WHERE 1=1";
     const values = [];
 
-    if (tenant) {
+    // RBAC: ถ้าเป็น viewer ให้เห็นเฉพาะ tenant ตัวเอง
+    if (req.user.role === "viewer") {
+        values.push(req.user.tenant);
+        query += ` AND tenant = $${values.length}`;
+    }
+
+    // ถ้าเป็น admin และมี query tenant มากับ request
+    if (tenant && req.user.role === "admin") {
         values.push(tenant);
         query += ` AND tenant = $${values.length}`;
     }
@@ -115,8 +136,90 @@ app.get("/logs", async (req, res) => {
     }
 });
 
-app.listen(3000, () => {
+// ALERT: detect brute force login
+app.get("/alerts/bruteforce", async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT src_ip, COUNT(*) AS attempts
+            FROM logs
+            WHERE event_type = 'login_failed'
+            AND timestamp > NOW() - INTERVAL '5 minutes'
+            GROUP BY src_ip
+            HAVING COUNT(*) >= 5
+        `);
+
+        res.json({
+            alert: result.rows.length > 0,
+            attackers: result.rows
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "alert query failed" });
+    }
+});
+
+//Login API
+app.post("/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    const result = await pool.query(
+        "SELECT * FROM users WHERE username=$1",
+        [username]
+    );
+
+    if (result.rows.length === 0) {
+        return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const user = result.rows[0];
+
+    if (password !== user.password) {
+        return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+        {
+            id: user.id,
+            role: user.role,
+            tenant: user.tenant
+        },
+        JWT_SECRET,
+        { expiresIn: "1h" }
+    );
+
+    res.json({ token });
+});
+//Create Auth Middleware
+function authenticate(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+        return res.status(401).json({ error: "No token" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (err) {
+        res.status(401).json({ error: "Invalid token" });
+    }
+}
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: "*" }
+});
+
+server.listen(3000, () => {
     console.log("Server running on port 3000");
+});
+
+io.on("connection", (socket) => {
+    console.log("Client connected");
 });
 
 const dgram = require("dgram");
@@ -137,6 +240,7 @@ syslogServer.on("message", async (msg, rinfo) => {
         raw: { message: message }
     };
 
+    try {
     await pool.query(
         `INSERT INTO logs(timestamp, tenant, source, event_type, src_ip, raw)
          VALUES($1,$2,$3,$4,$5,$6)`,
@@ -149,8 +253,12 @@ syslogServer.on("message", async (msg, rinfo) => {
             normalizedLog.raw
         ]
     );
+    } catch (err) {
+        console.error("Syslog DB error:", err);
+    }
 });
 
 syslogServer.bind(5140, () => {
     console.log("Syslog UDP listening on 5140");
 });
+
