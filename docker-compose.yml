@@ -16,12 +16,15 @@ services:
 
   grafana:
     image: grafana/grafana
-    container_name: grafana
+    container_name: log-grafana
     restart: always
     ports:
       - "3001:3000"
     depends_on:
       - postgres
+    volumes:
+      - grafana-data:/var/lib/grafana
 
 volumes:
   pgdata:
+  grafana-data:
