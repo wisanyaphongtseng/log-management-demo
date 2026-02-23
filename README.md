@@ -51,38 +51,30 @@ This project simulates a **Security Operations Center (SOC)** workflow including
 ## System Architecture
 
 Log Sources
-   │
-   ├── REST API (/ingest)
-   └── Syslog UDP (5140)
-        │
-        ▼
+ ├── REST API (/ingest)
+ └── Syslog UDP (5140)
+      ▼
 Node.js Backend
-        │
-        ├── Log Normalization
-        ├── Security Detection
-        └── Real-time Alert (Socket.IO)
-        │
-        ▼
+ ├── Log Normalization
+ ├── Security Detection
+ └── Real-time Alert (Socket.IO)
+      ▼
 PostgreSQL Database
-        │
-        ▼
+      ▼
 Grafana Dashboard
 
 ---
 
 ## Project Structure
 
-log-management-demo
-│
-├── backend
-│   ├── server.js
-│   ├── package.json
-│   └── .env
-│
-├── frontend
-│   └── alert.html
-│
-└── docker-compose.yml
+log-management-demo/
+ ├── backend/
+ │    ├── server.js
+ │    ├── package.json
+ │    └── .env
+ ├── frontend/
+ │    └── alert.html
+ └── docker-compose.yml
 
 ---
 
