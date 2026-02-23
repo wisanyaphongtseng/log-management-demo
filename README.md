@@ -50,6 +50,7 @@ This project simulates a **Security Operations Center (SOC)** workflow including
 
 ## System Architecture
 
+```text
 Log Sources
  ├── REST API (/ingest)
  └── Syslog UDP (5140)
@@ -62,19 +63,22 @@ Node.js Backend
 PostgreSQL Database
       ▼
 Grafana Dashboard
+```
 
 ---
 
 ## Project Structure
 
+```text
 log-management-demo/
- ├── backend/
- │    ├── server.js
- │    ├── package.json
- │    └── .env
- ├── frontend/
- │    └── alert.html
- └── docker-compose.yml
+├── backend/
+│   ├── .env            
+│   ├── package.json      
+│   └── server.js          
+├── frontend/
+│   └── alert.html         
+└── docker-compose.yml      
+```
 
 ---
 
