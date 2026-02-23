@@ -50,31 +50,70 @@ This project simulates a **Security Operations Center (SOC)** workflow including
 
 ## System Architecture
 
-Log Sources
- ├── REST API (/ingest)
- └── Syslog UDP (5140)
-      ▼
-Node.js Backend
- ├── Log Normalization
- ├── Security Detection
- └── Real-time Alert (Socket.IO)
-      ▼
-PostgreSQL Database
-      ▼
-Grafana Dashboard
+graph TD
+    %% Styling
+    classDef source fill:#f9f2f4,stroke:#d9534f,stroke-width:2px,color:#d9534f;
+    classDef backend fill:#eafaf1,stroke:#5cb85c,stroke-width:2px,color:#2e8b57;
+    classDef db fill:#ebf5fb,stroke:#337ab7,stroke-width:2px,color:#2874a6;
+    classDef dashboard fill:#fcf3cf,stroke:#f0ad4e,stroke-width:2px,color:#b9770e;
+
+    %% Nodes
+    subgraph Sources [Log Sources]
+        A[REST API <br/> /ingest]:::source
+        B[Syslog UDP <br/> 5140]:::source
+    end
+
+    subgraph Backend [Node.js Backend]
+        C[Log Normalization]:::backend
+        D[Security Detection]:::backend
+        E[Real-time Alert <br/> Socket.IO]:::backend
+    end
+
+    F[(PostgreSQL <br/> Database)]:::db
+    G{{Grafana <br/> Dashboard}}:::dashboard
+
+    %% Connections
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    C --> F
+    F --> G
 
 ---
 
 ## Project Structure
 
-log-management-demo/
- ├── backend/
- │    ├── server.js
- │    ├── package.json
- │    └── .env
- ├── frontend/
- │    └── alert.html
- └── docker-compose.yml
+graph LR
+    %% กำหนดสไตล์ของ Node
+    classDef folder fill:#f0f8ff,stroke:#5dade2,stroke-width:2px,color:#2874a6;
+    classDef file fill:#fdfefe,stroke:#aeb6bf,stroke-width:1px,color:#566573;
+    classDef config fill:#fbfcfc,stroke:#f4d03f,stroke-width:1px,color:#7d6608;
+
+    %% โครงสร้าง
+    Root["📁 log-management-demo/"]:::folder
+    
+    Backend["📁 backend/"]:::folder
+    Frontend["📁 frontend/"]:::folder
+    Docker["🐳 docker-compose.yml"]:::config
+
+    Root --> Backend
+    Root --> Frontend
+    Root --> Docker
+
+    %% ไฟล์ใน Backend
+    Env["⚙️ .env"]:::config
+    Pkg["📄 package.json"]:::file
+    Server["📄 server.js"]:::file
+
+    Backend --> Env
+    Backend --> Pkg
+    Backend --> Server
+
+    %% ไฟล์ใน Frontend
+    Alert["📄 alert.html"]:::file
+    
+    Frontend --> Alert
 
 ---
 
