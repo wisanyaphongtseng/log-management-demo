@@ -9,7 +9,7 @@ const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
-const JWT_SECRET = "supersecretkey";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const pool = new Pool({
     user: process.env.DB_USER,
@@ -29,9 +29,12 @@ app.post("/ingest", async (req, res) => {
         return res.status(400).json({ error: "No data received" });
     }
 
+    if (typeof log !== "object" || Array.isArray(log)) {
+        return res.status(400).json({ error: "invalid log format" });
+    }
+
     console.log("Received log:", log);
 
-    // ตัวอย่าง normalize
     const normalizedLog = {
         timestamp: log["@timestamp"] || new Date().toISOString(),
         tenant: log.tenant || "default",
@@ -39,23 +42,43 @@ app.post("/ingest", async (req, res) => {
         event_type: log.event_type || "unknown",
         user: log.user || null,
         src_ip: log.ip || "0.0.0.0",
-        raw: log
+        raw: log,
+        severity: "LOW"
     };
 
-    console.log("Normalized:", normalizedLog);
-
-    // บันทึกลงไฟล์ logs.txt
-    // fs.appendFileSync(
-    //     "logs.txt",
-    //     JSON.stringify(normalizedLog) + "\n"
-    // );
-
-    // TODO: save to database
-
     try {
+
+        // 🔎 ถ้าเป็น login_failed ตรวจ brute force ก่อน
+        if (normalizedLog.event_type === "login_failed") {
+
+            const result = await pool.query(
+                `SELECT COUNT(*) FROM logs
+                 WHERE src_ip=$1
+                 AND event_type='login_failed'
+                 AND timestamp > NOW() - INTERVAL '5 minutes'`,
+                [normalizedLog.src_ip]
+            );
+
+            const attempts = parseInt(result.rows[0].count);
+
+            if (attempts >= 5) {
+                normalizedLog.severity = "HIGH";
+
+                io.emit("security_alert", {
+                    message: "Brute force attack detected",
+                    ip: normalizedLog.src_ip,
+                    attempts: attempts,
+                    time: new Date()
+                });
+
+            } else {
+                normalizedLog.severity = "MEDIUM";
+            }
+        }
+
         await pool.query(
-            `INSERT INTO logs(timestamp, tenant, source, event_type, user_name, src_ip, raw)
-             VALUES($1,$2,$3,$4,$5,$6,$7)`,
+            `INSERT INTO logs(timestamp, tenant, source, event_type, user_name, src_ip, raw, severity)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
             [
                 normalizedLog.timestamp,
                 normalizedLog.tenant,
@@ -63,46 +86,20 @@ app.post("/ingest", async (req, res) => {
                 normalizedLog.event_type,
                 normalizedLog.user,
                 normalizedLog.src_ip,
-                normalizedLog.raw
+                normalizedLog.raw,
+                normalizedLog.severity
             ]
         );
 
-        console.log("Saved to database");
+        res.json({ status: "ok", message: "log received" });
 
     } catch (err) {
         console.error("DB Error:", err);
+        res.status(500).json({ error: "database error" });
     }
-
-    // ALERT RULE
-    if (normalizedLog.event_type === "login_failed") {
-        const result = await pool.query(
-        `SELECT COUNT(*) FROM logs
-         WHERE src_ip=$1
-         AND event_type='login_failed'
-         AND timestamp > NOW() - INTERVAL '5 minutes'`,
-        [normalizedLog.src_ip]
-        );
-
-    if (parseInt(result.rows[0].count) >= 5) {
-        console.log("🚨 ALERT: Possible brute force from", normalizedLog.src_ip);
-
-        io.emit("security_alert", {
-            message: "Brute force attack detected",
-            ip: normalizedLog.src_ip,
-            attempts: result.rows[0].count,
-            time: new Date()
-        });
-        }
-    }
-
-    res.json({
-        status: "ok",
-        message: "log received"
-    });
 });
-
 //Search API
-app.get("/logs", authenticate, async (req, res) => {
+app.get("/logs", auth, async (req, res) => {
     const { tenant, ip } = req.query;
 
     let query = "SELECT * FROM logs WHERE 1=1";
@@ -161,6 +158,7 @@ app.get("/alerts/bruteforce", async (req, res) => {
 
 //Login API
 app.post("/login", async (req, res) => {
+    try {
     const { username, password } = req.body;
 
     const result = await pool.query(
@@ -174,7 +172,9 @@ app.post("/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    if (password !== user.password) {
+    const valid = await bcrypt.compare(password, user.password);
+
+    if (!valid) {
         return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -189,24 +189,22 @@ app.post("/login", async (req, res) => {
     );
 
     res.json({ token });
+    } catch (err) {
+    res.status(500).json({ error: "server error" });
+    }
 });
 //Create Auth Middleware
-function authenticate(req, res, next) {
-    const authHeader = req.headers.authorization;
+function auth(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
 
-    if (!authHeader) {
-        return res.status(401).json({ error: "No token" });
-    }
+  if (!token) return res.status(401).json({ error: "No token" });
 
-    const token = authHeader.split(" ")[1];
-
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (err) {
-        res.status(401).json({ error: "Invalid token" });
-    }
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(403).json({ error: "Invalid token" });
+  }
 }
 
 const server = http.createServer(app);
@@ -237,7 +235,8 @@ syslogServer.on("message", async (msg, rinfo) => {
         source: "syslog",
         event_type: "network_event",
         src_ip: rinfo.address,
-        raw: { message: message }
+        raw: { message: message },
+        severity: "LOW"
     };
 
     try {

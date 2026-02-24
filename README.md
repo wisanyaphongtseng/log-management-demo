@@ -143,6 +143,14 @@ Then:
 2. Connect to the database
 3. Create dashboards to visualize logs & security events
 
+### Dashboard Preview
+
+![Dashboard](images/dashboard.png)
+
+## Real-time Alert
+
+![Alert](images/alert.png)
+
 ### Security Features
 - Brute force detection
 - Multi-tenant log isolation
