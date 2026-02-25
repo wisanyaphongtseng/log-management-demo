@@ -1,1 +1,0 @@
-echo "Firewall blocked connection" | nc -u localhost 5140

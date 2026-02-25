@@ -1,4 +1,0 @@
-[
-  {"tenant":"demoA","event_type":"login_failed","ip":"1.1.1.1"},
-  {"tenant":"demoA","event_type":"login_failed","ip":"1.1.1.1"}
-]

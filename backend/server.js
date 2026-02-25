@@ -212,9 +212,11 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-server.listen(3000, () => {
+if (require.main === module) {
+  server.listen(3000, () => {
     console.log("Server running on port 3000");
-});
+  });
+}
 
 io.on("connection", (socket) => {
     console.log("Client connected");
@@ -261,3 +263,4 @@ syslogServer.bind(5140, () => {
     console.log("Syslog UDP listening on 5140");
 });
 
+module.exports = app;
