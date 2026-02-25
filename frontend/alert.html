@@ -1,42 +1,114 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Security Alerts</title>
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <title>Security Alert Dashboard</title>
+  <script src="http://localhost:3000/socket.io/socket.io.js"></script>
   <style>
-    body { font-family: Arial; }
-    #alertBox {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: red;
+    body {
+      font-family: Arial;
+      background-color: #111;
       color: white;
-      padding: 15px;
-      border-radius: 8px;
-      display: none;
-      animation: blink 1s infinite;
+      padding: 20px;
     }
-    @keyframes blink {
-      50% { opacity: 0.5; }
+
+    h1 {
+      color: #00ffcc;
+    }
+
+    .alert-box {
+      background-color: red;
+      padding: 15px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #444;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #222;
+    }
+
+    .high {
+      color: red;
+      font-weight: bold;
     }
   </style>
 </head>
+
 <body>
 
-<h2>Security Monitoring Dashboard</h2>
+<h1>Security Monitoring Dashboard</h1>
 
-<div id="alertBox"></div>
+<div class="alert-box" id="alertBox">
+  <strong>ALERT:</strong> <span id="alertMessage"></span>
+</div>
+
+<h2>Detected Attackers</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Source IP</th>
+      <th>Attempts</th>
+      <th>Severity</th>
+    </tr>
+  </thead>
+  <tbody id="attackTable">
+  </tbody>
+</table>
 
 <script>
-const socket = io("http://localhost:3000");
+  const socket = io("http://localhost:3000");
 
-socket.on("security_alert", (data) => {
-  const box = document.getElementById("alertBox");
-  box.innerHTML = `ALERT<br>IP: ${data.ip}`;
-  box.style.display = "block";
+  const alertBox = document.getElementById("alertBox");
+  const alertMessage = document.getElementById("alertMessage");
+  const attackTable = document.getElementById("attackTable");
 
-  setTimeout(() => box.style.display = "none", 5000);
-});
+  function fetchAttackers() {
+    fetch("http://localhost:3000/alerts/bruteforce")
+      .then(res => res.json())
+      .then(data => {
+        attackTable.innerHTML = "";
+
+        if (data.attackers && data.attackers.length > 0) {
+          data.attackers.forEach(attacker => {
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+              <td>${attacker.src_ip}</td>
+              <td>${attacker.attempts}</td>
+              <td class="high">HIGH</td>
+            `;
+
+            attackTable.appendChild(row);
+          });
+        }
+      });
+  }
+
+  // Realtime alert
+  socket.on("security_alert", (data) => {
+    alertBox.style.display = "block";
+    alertMessage.innerText =
+      data.message + " | IP: " + data.ip + " | Attempts: " + data.attempts;
+
+    fetchAttackers();
+  });
+
+  // Auto refresh every 5 seconds
+  setInterval(fetchAttackers, 5000);
+
+  fetchAttackers();
 </script>
 
 </body>
