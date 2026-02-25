@@ -24,7 +24,7 @@ This system simulates a Security Operations Center (SOC) log monitoring platform
 
 ---
 
-## High-Level Architecture
+## Architecture
 
 ```text
 Log Sources
@@ -125,15 +125,5 @@ RBAC rules enforce access:
 
 ### Data Isolation
 - Tenant-based filtering
-
----
-
-## Scalability Design
-
-The architecture supports scaling by:
-
-- containerizing services
-- separating ingestion & processing
-- supporting cloud deployment
 
 ---
