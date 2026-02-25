@@ -149,7 +149,7 @@ Then:
 
 ## Real-time Alert
 
-![Alert](images/alert.png)
+![Alert](images/alert2.png)
 
 ### Security Features
 - Brute force detection
