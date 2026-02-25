@@ -5,6 +5,25 @@ This system simulates a Security Operations Center (SOC) log monitoring platform
 
 ---
 
+## Tech Stack
+
+### Backend
+- Node.js
+- Express.js
+- Socket.IO (real-time alerts)
+
+### Database
+- PostgreSQL
+
+### Monitoring & Visualization
+- Grafana
+
+### Infrastructure
+- Docker
+- Docker Compose
+
+---
+
 ## High-Level Architecture
 
 ```text
